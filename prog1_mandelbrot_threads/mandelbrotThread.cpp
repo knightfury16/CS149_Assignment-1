@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <thread>
+#include<cmath>
 
 #include "CycleTimer.h"
 
 typedef struct {
     float x0, x1;
     float y0, y1;
-    unsigned int width;
-    unsigned int height;
+    float width;
+    float height;
     int maxIterations;
     int* output;
     int threadId;
@@ -34,8 +35,20 @@ void workerThreadStart(WorkerArgs * const args) {
     // to compute a part of the output image.  For example, in a
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
+    float x0 = args->x0;
+    float y0 = args->y0;
+    float x1 = args->x1;
+    float y1 = args->y1;
+    int width = args->width;
+    int height = args->height;
+    int rowsPerThreadToCompute = std::ceil(args->height/ args->numThreads);
+    int startRow = args->threadId * rowsPerThreadToCompute; 
+    int maxIter = args->maxIterations;
+    int* output = args->output;
 
-    printf("Hello world from thread %d\n", args->threadId);
+    mandelbrotSerial(x0,y0,x1,y1,width,height, startRow, rowsPerThreadToCompute,maxIter, output);
+
+    // printf("Hello world from thread %d\n", args->threadId);
 }
 
 //
