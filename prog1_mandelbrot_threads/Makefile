@@ -12,6 +12,9 @@ default: $(APP_NAME)
 
 .PHONY: dirs clean
 
+dirs:
+	@if not exist $(OBJDIR) mkdir $(OBJDIR)
+
 clean:
 	del /Q /S $(OBJDIR) *.ppm *~ $(APP_NAME)
 
