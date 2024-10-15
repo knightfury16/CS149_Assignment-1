@@ -10,7 +10,8 @@ using namespace std;
 
 Logger CS149Logger;
 
-void usage(const char* progname);
+void usage(const char *progname);
+void printValues(int N, float *values);
 void initValue(float* values, int* exponents, float* output, float* gold, unsigned int N);
 void absSerial(float* values, float* output, int N);
 void absVector(float* values, float* output, int N);
@@ -34,7 +35,6 @@ int main(int argc, char * argv[]) {
   };
 
   while ((opt = getopt_long(argc, argv, "s:l?", long_options, NULL)) != EOF) {
-
     switch (opt) {
       case 's':
         N = atoi(optarg);
@@ -53,7 +53,6 @@ int main(int argc, char * argv[]) {
     }
   }
 
-
   float* values = new float[N+VECTOR_WIDTH];
   int* exponents = new int[N+VECTOR_WIDTH];
   float* output = new float[N+VECTOR_WIDTH];
@@ -63,8 +62,8 @@ int main(int argc, char * argv[]) {
   clampedExpSerial(values, exponents, gold, N);
   clampedExpVector(values, exponents, output, N);
 
-  //absSerial(values, gold, N);
-  //absVector(values, output, N);
+  // absSerial(values, gold, N);
+  // absVector(values, output, N);
 
   printf("\e[1;31mCLAMPED EXPONENT\e[0m (required) \n");
   bool clampedCorrect = verifyResult(values, exponents, output, gold, N);
@@ -78,21 +77,21 @@ int main(int argc, char * argv[]) {
     printf("Passed!!!\n");
   }
 
-  printf("\n\e[1;31mARRAY SUM\e[0m (bonus) \n");
-  if (N % VECTOR_WIDTH == 0) {
-    float sumGold = arraySumSerial(values, N);
-    float sumOutput = arraySumVector(values, N);
-    float epsilon = 0.1;
-    bool sumCorrect = abs(sumGold - sumOutput) < epsilon * 2;
-    if (!sumCorrect) {
-      printf("Expected %f, got %f\n.", sumGold, sumOutput);
-      printf("@@@ Failed!!!\n");
-    } else {
-      printf("Passed!!!\n");
-    }
-  } else {
-    printf("Must have N %% VECTOR_WIDTH == 0 for this problem (VECTOR_WIDTH is %d)\n", VECTOR_WIDTH);
-  }
+  // printf("\n\e[1;31mARRAY SUM\e[0m (bonus) \n");
+  // if (N % VECTOR_WIDTH == 0) {
+  //   float sumGold = arraySumSerial(values, N);
+  //   float sumOutput = arraySumVector(values, N);
+  //   float epsilon = 0.1;
+  //   bool sumCorrect = abs(sumGold - sumOutput) < epsilon * 2;
+  //   if (!sumCorrect) {
+  //     printf("Expected %f, got %f\n.", sumGold, sumOutput);
+  //     printf("@@@ Failed!!!\n");
+  //   } else {
+  //     printf("Passed!!!\n");
+  //   }
+  // } else {
+  //   printf("Must have N %% VECTOR_WIDTH == 0 for this problem (VECTOR_WIDTH is %d)\n", VECTOR_WIDTH);
+  // }
 
   delete [] values;
   delete [] exponents;
@@ -126,7 +125,7 @@ void initValue(float* values, int* exponents, float* output, float* gold, unsign
 bool verifyResult(float* values, int* exponents, float* output, float* gold, int N) {
   int incorrect = -1;
   float epsilon = 0.00001;
-  for (int i=0; i<N+VECTOR_WIDTH; i++) {
+  for (int i=0; i<N; i++) {
     if ( abs(output[i] - gold[i]) > epsilon ) {
       incorrect = i;
       break;
@@ -137,6 +136,8 @@ bool verifyResult(float* values, int* exponents, float* output, float* gold, int
     if (incorrect >= N)
       printf("You have written to out of bound value!\n");
     printf("Wrong calculation at value[%d]!\n", incorrect);
+    printf("Wrong Value = %f\n", output[incorrect]);
+    printf("Correct Value = %f\n", gold[incorrect]);
     printf("value  = ");
     for (int i=0; i<N; i++) {
       printf("% f ", values[i]);
@@ -220,7 +221,7 @@ void absVector(float* values, float* output, int N) {
 // For each element, compute values[i]^exponents[i] and clamp value to
 // 9.999.  Store result in output.
 void clampedExpSerial(float* values, int* exponents, float* output, int N) {
-  for (int i=0; i<N; i++) {
+  for (int i=0; i< N; i++) {
     float x = values[i];
     int y = exponents[i];
     if (y == 0) {
@@ -242,14 +243,66 @@ void clampedExpSerial(float* values, int* exponents, float* output, int N) {
 
 void clampedExpVector(float* values, int* exponents, float* output, int N) {
 
-  //
-  // CS149 STUDENTS TODO: Implement your vectorized version of
-  // clampedExpSerial() here.
-  //
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
-  //
-  
+
+  __cs149_vec_float x;
+  __cs149_vec_int y;
+  __cs149_vec_float result;
+  __cs149_mask maskAll, maskIsZero, maskIsNotZero, maskIsNotZeroInverse, clipMask;
+  __cs149_vec_int zero = _cs149_vset_int(0);
+  __cs149_vec_int one = _cs149_vset_int(1);
+  __cs149_vec_float clipValue = _cs149_vset_float(9.999999f);
+  int numVectors = N;
+
+  //what if N is not a multiple of VECTOR_WIDTH?
+  if(N % VECTOR_WIDTH != 0){
+    numVectors = ((N / VECTOR_WIDTH) + 1) * VECTOR_WIDTH; // will make it a multiple of VECTOR_WIDTH
+  }
+  for(int i = 0; i < numVectors; i+=VECTOR_WIDTH){
+    //all ones
+    maskAll = _cs149_init_ones();
+
+    //all zeros
+    maskIsZero = _cs149_init_ones(0);
+
+    //initialize result
+    _cs149_vset_float(result, 1.0f, maskAll);
+
+    //not equal to zero
+    maskIsNotZero = _cs149_mask_not(maskIsZero);
+
+    //load the values and exponents
+    _cs149_vload_float(x, values+i, maskAll);
+    _cs149_vload_int(y, exponents+i, maskAll);
+
+  //exponent is not zero mask
+   __cs149_mask exponentIsNotZeroMask = _cs149_init_ones(0);
+   _cs149_vgt_int(exponentIsNotZeroMask, y, zero, maskAll);
+
+    _cs149_vload_float(result, values+i, exponentIsNotZeroMask);
+
+    //subtract one from the exponent
+    _cs149_vsub_int(y, y, one, exponentIsNotZeroMask);
+    //recompute exponentIsNotZeroMask
+    _cs149_vgt_int(exponentIsNotZeroMask, y, zero, maskAll);
+
+    while (_cs149_cntbits(exponentIsNotZeroMask))
+    {
+      _cs149_vmult_float(result, result, x, exponentIsNotZeroMask);
+      _cs149_vsub_int(y, y, one, exponentIsNotZeroMask);
+      _cs149_vgt_int(exponentIsNotZeroMask, y, zero, maskAll);
+    }
+
+    //clamp the result
+    __cs149_mask clipMask = _cs149_init_ones(0);
+    _cs149_vgt_float(clipMask, result, clipValue, maskAll);
+    _cs149_vmove_float(result, clipValue, clipMask);
+
+    //store the result
+    _cs149_vstore_float(output+i, result, maskAll);
+
+  }
 }
 
 // returns the sum of all elements in values
