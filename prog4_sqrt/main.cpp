@@ -35,6 +35,12 @@ int main() {
         
         // starter code populates array with random input values
         values[i] = .001f + 2.998f * static_cast<float>(rand()) / RAND_MAX;
+
+        //values between 2.7 to 2.999
+        // values[i] = 2.7f + 0.299f * static_cast<float>(rand()) / RAND_MAX;
+
+        //--values all 2.5
+        values[i] = 1.0f;
     }
 
     // generate a gold version to check results
